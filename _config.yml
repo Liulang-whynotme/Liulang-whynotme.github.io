@@ -34,7 +34,6 @@ lang: ch
 
 # If you want to show the subtitle anywhere else than the front page, use
 # {% include subtitle.html %} to include it anywhere you want.
-{% include subtitle.html %}
 show-subtitle: true
 display-social-icons: false
 # If you want social links to open in a new tab, set this as true
