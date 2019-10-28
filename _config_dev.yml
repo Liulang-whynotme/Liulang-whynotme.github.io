@@ -1,0 +1,131 @@
+
+# The name of your website.
+name: 刘浪
+
+description:
+
+  # Description of your site. This will show up in google.
+  meta: 个人开发者刘浪的游戏介绍网站
+
+  # Description of your site. This will show up on the front page.
+  subtitle: 彼能是，而我乃不能是？
+
+author:
+  name: 刘浪
+
+  # Necessary for contact page
+  email: smallrainwish@126.com
+
+  # Optional text (html) to display after author name. Leave empty if you don't
+  # want it.
+  info:
+
+url: 
+baseurl: 
+
+# language attribute in <html> element.
+lang: ch
+
+# FROM THIS POINT ON EVERYTHING IS OPTIONAL
+
+##############
+# APPEREANCE #
+##############
+
+# If you want to show the subtitle anywhere else than the front page, use
+# {% include subtitle.html %} to include it anywhere you want.
+show-subtitle: true
+display-social-icons: false
+
+footer-text: 我愿打造你从未玩过的游戏。<br><a href="http://www.baidu.com">隐私政策</a>
+
+# Preferably 64px in height. Leave empty = disable.
+logo-image: # /img/logo.png
+
+# Toolbar color for Chrome on Android.
+theme-color-attr: "#00f0ff"
+
+# Color of Microsoft live Tile.
+ms-tile-color: "#00f0ff"
+
+# Color used throughout the theme. Format: R, G, B.
+theme-color: 0, 240, 255 # Original: 0, 240, 255
+
+# Text color used throughout the theme. Format: R, G, B.
+text-color: 0, 0, 0 # Original: 0, 0, 0
+
+# Background color used throughout the theme. Format: R, G, B.
+# Note: if you change the background color AND you use cover images, you should
+#       also change the CSS gradient in "_includes\gradient.css" to match the
+#       background color. Edit and copy it from here:
+#       http://www.colorzilla.com/gradient-editor/#ffffff+0,ffffff+100&0+0,1+100
+background-color: 255, 255, 255 # Original: 255, 255, 255
+
+display-author-post-page: true
+display-author-front-page: true
+
+# http://alanwsmith.com/jekyll-liquid-date-formatting-examples
+date_format: "%Y-%m-%d"
+
+# Minimal screen-width after which the navigation will change position from
+# vertical to horizontal.
+nav-breaking-point: 520px
+
+# Number of posts on each page.
+paginate: 3
+
+# Display links for the previous and next post on post pages.
+display-next-prev-post: false
+
+# Leave empty if you don't want comments on post pages.
+disqus-shortname:
+
+
+################
+# SOCIAL ICONS #
+################
+
+# Use a complete url here, including http:// and such. Requiring just usernames
+# has been considered, but this is way more customizable.
+facebook:
+github:
+
+
+#####################
+# CUSTOMIZABLE TEXT #
+#####################
+
+# Useful for translating into other languages.
+
+var_on_the_web: : )
+var_read: 阅读
+var_newer: 更近
+var_older: 更早
+var_next_post: 下一则
+var_previous_post: 上一则
+var_post_by: 作者
+var_guest_post_by: 作者
+var_your_email: 你的邮箱
+var_your_message: 你的信息
+
+
+##################
+# BUILD SETTINGS #
+##################
+
+# You don't have to change these.
+
+exclude: [vendor]
+highlighter: rouge
+kramdown:
+  input: GFM
+paginate_path: "/page-:num/"
+permalink: pretty
+defaults:
+  -
+    scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
+      excerpt_separator: "<!--more-->"
