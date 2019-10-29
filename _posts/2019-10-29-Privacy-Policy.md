@@ -3,7 +3,9 @@ title: Privacy Policy
 summary: A declaration of how your privacy is protected when you experience my products
 ---
 This privacy policy was writen and released by Lang Liu, the individual developer, in order to clarify how your privacy is protected when you experience my products.
+
 ---
+
 ## 1 Terms
 ### 1.1 Developer
 Lang Liu, the entity who designs, develops, releases games and reserves copyright for the products released and currently on sale.
@@ -29,4 +31,5 @@ Data saved in local user's device which discribes the progress of games.
 6. For iOS device, given that Game Center is successfully authenticated, my games process your saved files and send them to Game Center. To mention twice, the saved files and the way they are processed do not imply any user information.
 
 ## 3 Spirit and Principles
+
 The developer respects your rights for your privacy, and aims at protecting your privacy, and treasures the mutual trust between developer and users.
