@@ -42,7 +42,7 @@ social-icons-open-newtab: true
 footer-text: 我愿打造你从未玩过的游戏。
 
 # Preferably 64px in height. Leave empty = disable.
-logo-image: # /img/logo.png
+logo-image: #/img/logo.png
 
 # Toolbar color for Chrome on Android.
 theme-color-attr: "#00f0ff"
