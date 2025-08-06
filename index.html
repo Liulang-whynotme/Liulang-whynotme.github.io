@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twisted Ring Geometry - THREE.js</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #666666, #cccccc);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #title {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: black;
+            font-size: 32px;
+            font-weight: bold;
+            z-index: 100;
+            text-align: center;
+        }
+        
+        #subtitle {
+            position: absolute;
+            top: 65px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: black;
+            font-size: 18px;
+            z-index: 100;
+            text-align: center;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: black;
+            font-size: 18px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            padding: 0;
+            margin: 0;
+            background: none;
+            border: none;
+        }
+        
+        #controls label {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        #controls input[type="range"] {
+            width: 250px;
+            height: 25px;
+            margin: 0 10px;
+            cursor: pointer;
+        }
+        
+        #controls span {
+            display: inline-block;
+            width: 80px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        #splitButton {
+            margin-top: 10px;
+            padding: 15px 30px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 20px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        #splitButton:hover:not(:disabled) {
+            background-color: #ff5252;
+        }
+        
+        #splitButton:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="title">扭曲环几何体演示</div>
+    <div id="subtitle">使用鼠标拖动旋转视角 | 滚轮缩放</div>
+    
+    <div id="controls">
+        <label>
+            扭转数: <span id="twistValue">0</span>
+            <input type="range" id="twist" min="0" max="4" value="0" step="1">
+        </label>
+        <button id="splitButton">
+            剪断环状几何体
+        </button>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports":{
+                "three": "./three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from './three.module.js';
+        import { OrbitControls } from './OrbitControls.js';
+        import { MakeRing } from './MakeRing.js';
+
+        let scene, camera, renderer, meshA, meshB, group, controls;
+        let makeRing;
+        let raycaster, mouse;
+        let dragStartPoint, dragStartMouse, delta, dragPlane, pointCoordinate;
+
+        function init() 
+        {
+            // 创建场景
+            scene = new THREE.Scene();
+            // Create gradient background for the scene
+            const canvas = document.createElement('canvas');
+            canvas.width = 2;
+            canvas.height = 512;
+            const context = canvas.getContext('2d');
+            const gradient = context.createLinearGradient(0, 0, 0, 512);
+            gradient.addColorStop(0, '#666666');
+            gradient.addColorStop(1, '#cccccc');
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 2, 512);
+            
+            const backgroundTexture = new THREE.CanvasTexture(canvas);
+            scene.background = backgroundTexture;
+
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(180, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(20, 20, 20);
+            camera.lookAt(0, 0, 0);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            // 创建轨道控制器
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.mouseButtons.LEFT =  THREE.MOUSE.ROTATE;
+            controls.mouseButtons.MIDDLE =  THREE.MOUSE.PAN;
+            controls.mouseButtons.RIGHT =  THREE.MOUSE.PAN;
+
+            // 创建光源
+            const ambientLight = new THREE.AmbientLight(0xaaaaaa, 0.8);
+            scene.add(ambientLight);
+
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 3.6);
+            directionalLight1.position.set(10, 10, 5);
+            scene.add(directionalLight1);
+
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1.5);
+            directionalLight2.position.set(-10, -10, -5);
+            scene.add(directionalLight2);
+
+            const pointLight = new THREE.PointLight(0xffffff, 3.3, 100);
+            pointLight.position.set(-10, -10, -5);
+            scene.add(pointLight);
+
+
+            // 初始创建几何体
+            makeRing = new MakeRing();
+            makeRing.InitializeParticles(THREE);
+            //makeRing.DoubleTheParticles(THREE);
+            createObject();
+
+            // 设置控件事件
+            setupControls();
+
+            // 处理窗口大小变化
+            window.addEventListener('resize', onWindowResize, false);
+            
+            // 初始化鼠标追踪
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            dragStartPoint = new THREE.Vector3();
+            pointCoordinate = new THREE.Vector2();
+            delta = new THREE.Vector3();
+            makeRing.fixedPointID_Left = -1;
+            
+            // 添加鼠标事件监听器
+            renderer.domElement.addEventListener('mousemove', onMouseMove, false);
+            renderer.domElement.addEventListener('mousedown', onMouseDown, false);
+            renderer.domElement.addEventListener('mouseup', onMouseUp, false);
+            
+        }
+
+        function createObject()
+        {
+            if (group)
+            {
+                scene.remove(group);
+            }
+            
+            const geometry = makeRing.createGeometry(THREE);
+            const material = new THREE.MeshPhongMaterial();
+            material.color = new THREE.Color(0xeda25f);
+            material.shininess = 350;
+            material.side = THREE.DoubleSide;
+            meshA = new THREE.Mesh(geometry.A, material);
+            group = new THREE.Group();
+            group.add(meshA);
+            if (geometry.B)
+            {
+                meshB = new THREE.Mesh(geometry.B, material);
+                group.add(meshB);
+            }
+            scene.add(group);
+        }
+
+        function updateObject() 
+        {
+            if (group) 
+            {
+                if (meshB)
+                {
+                    makeRing.updateVertices(THREE, meshA.geometry, meshB.geometry);
+                    makeRing.updateNormals(meshA.geometry, meshB.geometry);
+                }else
+                {
+                    makeRing.updateVertices(THREE, meshA.geometry, null);
+                    makeRing.updateNormals(meshA.geometry, null);
+                }
+            }
+        }
+
+        function setupControls() 
+        {
+            const twistSlider = document.getElementById('twist');
+            const splitButton = document.getElementById('splitButton');
+
+            twistSlider.addEventListener('input', (e) => {
+                makeRing.TwistNum = parseInt(e.target.value);
+                document.getElementById('twistValue').textContent = e.target.value;
+                makeRing.InitializeParticles(THREE);
+                if (meshB)
+                {
+                    group.remove(meshB);
+                    meshB = null;
+                }
+                //makeRing.DoubleTheParticles(THREE);
+                createObject();
+                
+                // 重新启用剪断按钮
+                splitButton.disabled = false;
+                splitButton.style.backgroundColor = '#ff6b6b';
+                splitButton.style.cursor = 'pointer';
+            });
+
+            splitButton.addEventListener('click', () => {
+                makeRing.DoubleTheParticles(THREE);
+                createObject();
+                
+                // 禁用按钮，防止再次点击
+                splitButton.disabled = true;
+                splitButton.style.backgroundColor = '#cccccc';
+                splitButton.style.cursor = 'not-allowed';
+            });
+        }
+
+        function onWindowResize() 
+        {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) 
+        {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            if (makeRing.fixedPointID_Left !== -1)
+            {
+                // 计算当前鼠标射线与拖拽平面的交点
+                const currentMouseRay = new THREE.Ray();
+                raycaster.setFromCamera(mouse, camera);
+                currentMouseRay.origin.copy(raycaster.ray.origin);
+                currentMouseRay.direction.copy(raycaster.ray.direction);
+                
+                const currentPoint = new THREE.Vector3();
+                
+                if (currentMouseRay.intersectPlane(dragPlane, currentPoint)) 
+                {
+                    // 计算从起始点到当前点的位移
+                    delta.subVectors(currentPoint, dragStartPoint);
+                    
+                    // 更新起始点，使拖拽连续
+                    dragStartPoint.copy(currentPoint);
+                    
+                    // 更新起始鼠标位置（可选，取决于需要的精确度）
+                    dragStartMouse.set(mouse.x, mouse.y);
+                }
+
+                //console.log('delta: ['+delta.x+', '+delta.y+', '+delta.z+'].');
+            }
+            
+        }
+
+        function onMouseDown(event)
+        {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // 更新射线投射器
+            raycaster.setFromCamera(mouse, camera);
+            
+            // 检查是否射中几何体
+            const intersects = raycaster.intersectObject(group, true);
+            
+            if (intersects.length > 0) 
+            {
+                //console.log('Hit');
+                //fixedFace = intersects[0].faceIndex;
+                //console.log('hit face ID is: '+fixedFace+', and the index is: ['+faceindex[fixedFace*3]+', '+faceindex[fixedFace*3+1]+', '+faceindex[fixedFace*3+2]+'].');
+                makeRing.fixedPointID_Left = Math.floor(intersects[0].faceIndex / (makeRing.InterpolationNum * 2));
+                if (intersects[0].object===meshA)
+                {
+                    makeRing.fixedPointMesh_Left = 'A';
+                    if (makeRing.fixedPointID_Left===makeRing.ParticleNum - 1)
+                    {
+                        makeRing.fixedPointID_Right = 0;
+                        if (meshB && makeRing.TwistNum%2!==0)
+                        {
+                            makeRing.fixedPointMesh_Right = 'B';
+                        }else
+                        {
+                            makeRing.fixedPointMesh_Right = 'A';
+                        }
+                    }else
+                    {
+                        makeRing.fixedPointID_Right = makeRing.fixedPointID_Left + 1;
+                        makeRing.fixedPointMesh_Right = 'A';
+                    }
+                }else
+                {
+                    makeRing.fixedPointMesh_Left = 'B';
+                    if (makeRing.fixedPointID_Left===makeRing.ParticleNum - 1)
+                    {
+                        makeRing.fixedPointID_Right = 0;
+                        if (makeRing.TwistNum%2!==0)
+                        {
+                            makeRing.fixedPointMesh_Right = 'A';
+                        }else
+                        {
+                            makeRing.fixedPointMesh_Right = 'B';
+                        }
+                    }else
+                    {
+                        makeRing.fixedPointID_Right = makeRing.fixedPointID_Left + 1;
+                        makeRing.fixedPointMesh_Right = 'B';
+                    }
+                }
+                
+                // 记录初始鼠标位置（归一化设备坐标）
+                dragStartPoint.copy(intersects[0].point);
+                dragStartMouse = new THREE.Vector2(mouse.x, mouse.y);
+                var X = new THREE.Vector3();
+                var Y = new THREE.Vector3();
+                var P = new THREE.Vector3();
+                if (makeRing.fixedPointMesh_Left==='A')
+                {
+                    if (makeRing.fixedPointMesh_Right==='A')
+                    {
+                        X.subVectors(makeRing.PositionsA[makeRing.fixedPointID_Right], makeRing.PositionsA[makeRing.fixedPointID_Left]);
+                    }else
+                    {
+                        X.subVectors(makeRing.PositionsB[makeRing.fixedPointID_Right], makeRing.PositionsA[makeRing.fixedPointID_Left]);
+                    }
+                    Y = new THREE.Vector3().copy(makeRing.TransverseVectorsA[makeRing.fixedPointID_Left]).multiplyScalar(makeRing.Width/2);
+                    P = new THREE.Vector3().subVectors(dragStartPoint, makeRing.PositionsA[makeRing.fixedPointID_Left])
+                }else
+                {
+                    if (makeRing.fixedPointMesh_Right==='A')
+                    {
+                        X.subVectors(makeRing.PositionsA[makeRing.fixedPointID_Right], makeRing.PositionsB[makeRing.fixedPointID_Left]);
+                    }else
+                    {
+                        X.subVectors(makeRing.PositionsB[makeRing.fixedPointID_Right], makeRing.PositionsB[makeRing.fixedPointID_Left]);
+                    }
+                    Y = new THREE.Vector3().copy(makeRing.TransverseVectorsB[makeRing.fixedPointID_Left]).multiplyScalar(makeRing.Width/2);
+                    P = new THREE.Vector3().subVectors(dragStartPoint, makeRing.PositionsB[makeRing.fixedPointID_Left])
+                }
+
+                const D = X.dot(X) * Y.dot(Y) - X.dot(Y) * X.dot(Y);
+                pointCoordinate.x = (X.dot(P) * Y.dot(Y) - Y.dot(P) * X.dot(Y)) / D;
+                pointCoordinate.y = (X.dot(X) * Y.dot(P) - X.dot(P) * X.dot(Y)) / D;
+                
+                // 创建拖拽平面：垂直于相机视线，通过控制点
+                controls.enabled = false;
+                const cameraDirection = new THREE.Vector3();
+                camera.getWorldDirection(cameraDirection);
+                dragPlane = new THREE.Plane(cameraDirection, -dragStartPoint.dot(cameraDirection));
+            } else 
+            {
+                makeRing.fixedPointID_Left = -1;
+            }
+        }
+
+        function onMouseUp(event)
+        {
+            makeRing.fixedPointID_Left = -1;
+            controls.enabled = true;
+        }
+
+        let cameraFOVAnimationComplete = false;
+        const targetFOV = 60;
+        const animationDuration = 1000; // 2秒动画
+        const startTime = Date.now();
+        
+        function animate()
+        {
+            requestAnimationFrame(animate);
+            
+            // 相机FOV动画
+            if (!cameraFOVAnimationComplete) 
+            {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.sin(elapsed / animationDuration * Math.PI * 0.5);
+                const currentFOV = 180 * (1 - progress) + progress * targetFOV;
+                
+                camera.fov = currentFOV;
+                camera.updateProjectionMatrix();
+                
+                if (elapsed / animationDuration >= 1) 
+                {
+                    cameraFOVAnimationComplete = true;
+                }
+            }
+            
+            controls.update();
+            makeRing.RepulsionFactor = 0.2 + (makeRing.RepulsionFactor-0.2)*0.999;
+
+            for (let i = 0; i < 200; i++)
+            {
+                makeRing.RunDynamics(THREE, delta, pointCoordinate);
+                makeRing.Dragging(THREE, dragStartPoint, delta, pointCoordinate);
+            }
+            makeRing.InterpolateTheParticles(THREE);
+            updateObject();
+            renderer.render(scene, camera);
+        }
+
+        // 启动应用
+        init();
+        animate();
+    </script>
+
+</body>
+</html>
