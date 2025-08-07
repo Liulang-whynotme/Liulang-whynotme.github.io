@@ -30,6 +30,50 @@
             text-align: center;
         }
         
+        @media (max-width: 768px) {
+            #title {
+                font-size: 24px;
+            }
+            
+            #subtitle {
+                font-size: 14px;
+                top: 55px;
+            }
+            
+            #controls {
+                bottom: 20px;
+            }
+            
+            #controls label {
+                font-size: 16px;
+            }
+            
+            #controls input[type="range"] {
+                width: 200px;
+            }
+            
+            #controls span {
+                font-size: 16px;
+                width: 60px;
+            }
+            
+            #splitButton {
+                font-size: 16px;
+                padding: 12px 24px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            #title {
+                font-size: 20px;
+            }
+            
+            #subtitle {
+                font-size: 12px;
+                top: 50px;
+            }
+        }
+        
         #subtitle {
             position: absolute;
             top: 65px;
@@ -68,7 +112,7 @@
         }
         
         #controls input[type="range"] {
-            width: 250px;
+            width: 400px;
             height: 25px;
             margin: 0 10px;
             cursor: pointer;
@@ -76,7 +120,7 @@
         
         #controls span {
             display: inline-block;
-            width: 80px;
+            width: 40px;
             text-align: center;
             font-size: 20px;
             font-weight: bold;
@@ -85,10 +129,10 @@
         #splitButton {
             margin-top: 10px;
             padding: 15px 30px;
-            background: #ff6b6b;
-            color: white;
+            background: #0062ff;
+            color: rgb(255, 255, 255);
             border: none;
-            border-radius: 25px;
+            border-radius: 30px;
             cursor: pointer;
             font-size: 20px;
             font-weight: bold;
@@ -96,7 +140,7 @@
         }
         
         #splitButton:hover:not(:disabled) {
-            background-color: #ff5252;
+            background-color: #5093ff;
         }
         
         #splitButton:disabled {
@@ -108,16 +152,16 @@
 <body>
     <div id="container"></div>
     
-    <div id="title">扭曲环几何体演示</div>
-    <div id="subtitle">使用鼠标拖动旋转视角 | 滚轮缩放</div>
+    <div id="title">一个扭转的小纸环</div>
+    <div id="subtitle">使用鼠标/手指拖拽小纸环</div>
     
     <div id="controls">
         <label>
-            扭转数: <span id="twistValue">0</span>
+            扭转半圈数: <span id="twistValue">0</span>
             <input type="range" id="twist" min="0" max="4" value="0" step="1">
         </label>
         <button id="splitButton">
-            剪断环状几何体
+            沿中线剪开
         </button>
     </div>
 
@@ -175,21 +219,33 @@
             controls.mouseButtons.MIDDLE =  THREE.MOUSE.PAN;
             controls.mouseButtons.RIGHT =  THREE.MOUSE.PAN;
 
-            // 创建光源
-            const ambientLight = new THREE.AmbientLight(0xaaaaaa, 0.8);
+            // 创建环境光 - 降低强度以突出结构色
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
             scene.add(ambientLight);
 
-            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 3.6);
-            directionalLight1.position.set(10, 10, 5);
-            scene.add(directionalLight1);
+            // 创建相机绑定的光源组
+            const cameraLightGroup = new THREE.Group();
+            cameraLightGroup.name = 'cameraLightGroup';
+            scene.add(cameraLightGroup);
 
-            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1.5);
-            directionalLight2.position.set(-10, -10, -5);
-            scene.add(directionalLight2);
+            // 主光源 - 白色方向光，强度适中
+            const mainLight = new THREE.DirectionalLight(0xffffff, 0.85);
+            mainLight.position.set(0, 0, 1); // 相对于相机前方
+            cameraLightGroup.add(mainLight);
 
-            const pointLight = new THREE.PointLight(0xffffff, 3.3, 100);
-            pointLight.position.set(-10, -10, -5);
-            scene.add(pointLight);
+            // 彩色补光 - 从多个角度提供不同色温的光源以激发彩虹效果
+            const warmLight = new THREE.DirectionalLight(0xffaa88, 0.4);
+            warmLight.position.set(1, 0.5, 0.5);
+            cameraLightGroup.add(warmLight);
+
+            const coolLight = new THREE.DirectionalLight(0x88aaff, 0.4);
+            coolLight.position.set(-1, 0.5, 0.5);
+            cameraLightGroup.add(coolLight);
+
+            // 侧光 - 增强结构色可见性
+            const sideLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            sideLight.position.set(0, 1, -0.5);
+            cameraLightGroup.add(sideLight);
 
 
             // 初始创建几何体
@@ -217,6 +273,11 @@
             renderer.domElement.addEventListener('mousedown', onMouseDown, false);
             renderer.domElement.addEventListener('mouseup', onMouseUp, false);
             
+            // 添加触摸事件监听器
+            renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+            renderer.domElement.addEventListener('touchmove', onTouchMove, false);
+            renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+            
         }
 
         function createObject()
@@ -227,16 +288,30 @@
             }
             
             const geometry = makeRing.createGeometry(THREE);
-            const material = new THREE.MeshPhongMaterial();
-            material.color = new THREE.Color(0xeda25f);
-            material.shininess = 350;
-            material.side = THREE.DoubleSide;
+            
+            // 优化结构色材质参数以展现彩虹效果
+            const material = new THREE.MeshPhysicalMaterial({
+                color: 0xFFD394,
+                //color: 0xC4EFFF,
+                metalness: 0.05,              // 轻微金属感以突出结构色
+                roughness: 0.5,              // 适度粗糙度平衡柔和与彩虹效果
+                clearcoat: 0.2,               // 清漆层增强彩虹反射
+                clearcoatRoughness: 0.3,     // 较光滑的清漆表面
+                iridescence: 0.96,             // 最大化结构色强度
+                iridescenceIOR: 0.82,          // 提高折射率以增强彩虹分离
+                iridescenceThicknessRange: [100, 900],  // 更宽的厚度范围产生更多颜色变化
+                side: THREE.DoubleSide,
+                envMapIntensity: 0.7          // 适中的环境反射强度
+            });
+            
             meshA = new THREE.Mesh(geometry.A, material);
+            meshA.geometry.boundingSphere = new THREE.Sphere().set(new THREE.Vector3(0, 0, 0), 100);
             group = new THREE.Group();
             group.add(meshA);
             if (geometry.B)
             {
                 meshB = new THREE.Mesh(geometry.B, material);
+                meshB.geometry.boundingSphere = new THREE.Sphere().set(new THREE.Vector3(0, 0, 0), 100);
                 group.add(meshB);
             }
             scene.add(group);
@@ -272,12 +347,16 @@
                     group.remove(meshB);
                     meshB = null;
                 }
-                //makeRing.DoubleTheParticles(THREE);
+                // 重置相机位置和朝向到初始状态
+                camera.position.set(20, 20, 20);
+                camera.lookAt(0, 0, 0);
+                controls.target.set(0, 0, 0);
+                controls.update();
+
                 createObject();
                 
-                // 重新启用剪断按钮
                 splitButton.disabled = false;
-                splitButton.style.backgroundColor = '#ff6b6b';
+                splitButton.style.backgroundColor = '#0062ff';
                 splitButton.style.cursor = 'pointer';
             });
 
@@ -285,7 +364,6 @@
                 makeRing.DoubleTheParticles(THREE);
                 createObject();
                 
-                // 禁用按钮，防止再次点击
                 splitButton.disabled = true;
                 splitButton.style.backgroundColor = '#cccccc';
                 splitButton.style.cursor = 'not-allowed';
@@ -306,7 +384,6 @@
 
             if (makeRing.fixedPointID_Left !== -1)
             {
-                // 计算当前鼠标射线与拖拽平面的交点
                 const currentMouseRay = new THREE.Ray();
                 raycaster.setFromCamera(mouse, camera);
                 currentMouseRay.origin.copy(raycaster.ray.origin);
@@ -316,17 +393,12 @@
                 
                 if (currentMouseRay.intersectPlane(dragPlane, currentPoint)) 
                 {
-                    // 计算从起始点到当前点的位移
                     delta.subVectors(currentPoint, dragStartPoint);
-                    
-                    // 更新起始点，使拖拽连续
+
                     dragStartPoint.copy(currentPoint);
                     
-                    // 更新起始鼠标位置（可选，取决于需要的精确度）
                     dragStartMouse.set(mouse.x, mouse.y);
                 }
-
-                //console.log('delta: ['+delta.x+', '+delta.y+', '+delta.z+'].');
             }
             
         }
@@ -336,17 +408,12 @@
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-            // 更新射线投射器
             raycaster.setFromCamera(mouse, camera);
             
-            // 检查是否射中几何体
             const intersects = raycaster.intersectObject(group, true);
             
             if (intersects.length > 0) 
             {
-                //console.log('Hit');
-                //fixedFace = intersects[0].faceIndex;
-                //console.log('hit face ID is: '+fixedFace+', and the index is: ['+faceindex[fixedFace*3]+', '+faceindex[fixedFace*3+1]+', '+faceindex[fixedFace*3+2]+'].');
                 makeRing.fixedPointID_Left = Math.floor(intersects[0].faceIndex / (makeRing.InterpolationNum * 2));
                 if (intersects[0].object===meshA)
                 {
@@ -386,7 +453,6 @@
                     }
                 }
                 
-                // 记录初始鼠标位置（归一化设备坐标）
                 dragStartPoint.copy(intersects[0].point);
                 dragStartMouse = new THREE.Vector2(mouse.x, mouse.y);
                 var X = new THREE.Vector3();
@@ -420,7 +486,6 @@
                 pointCoordinate.x = (X.dot(P) * Y.dot(Y) - Y.dot(P) * X.dot(Y)) / D;
                 pointCoordinate.y = (X.dot(X) * Y.dot(P) - X.dot(P) * X.dot(Y)) / D;
                 
-                // 创建拖拽平面：垂直于相机视线，通过控制点
                 controls.enabled = false;
                 const cameraDirection = new THREE.Vector3();
                 camera.getWorldDirection(cameraDirection);
@@ -435,6 +500,35 @@
         {
             makeRing.fixedPointID_Left = -1;
             controls.enabled = true;
+        }
+
+        function onTouchStart(event) {
+            event.preventDefault();
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                const mouseEvent = {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                };
+                onMouseDown(mouseEvent);
+            }
+        }
+
+        function onTouchMove(event) {
+            event.preventDefault();
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                const mouseEvent = {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                };
+                onMouseMove(mouseEvent);
+            }
+        }
+
+        function onTouchEnd(event) {
+            event.preventDefault();
+            onMouseUp({});
         }
 
         let cameraFOVAnimationComplete = false;
@@ -463,7 +557,15 @@
             }
             
             controls.update();
-            makeRing.RepulsionFactor = 0.2 + (makeRing.RepulsionFactor-0.2)*0.999;
+            
+            // 更新相机光源组位置，使其跟随相机
+            const cameraLightGroup = scene.getObjectByName('cameraLightGroup');
+            if (cameraLightGroup) {
+                cameraLightGroup.position.copy(camera.position);
+                cameraLightGroup.quaternion.copy(camera.quaternion);
+            }
+            
+            makeRing.RepulsionFactor = 0.2 + (makeRing.RepulsionFactor-0.2)*0.996;
 
             for (let i = 0; i < 200; i++)
             {
@@ -475,7 +577,6 @@
             renderer.render(scene, camera);
         }
 
-        // 启动应用
         init();
         animate();
     </script>

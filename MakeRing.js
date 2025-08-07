@@ -74,7 +74,7 @@ export class MakeRing
         
         this.RefDistance = 2*this.Radius*Math.sin(Math.PI/this.ParticleNum);
         this.Width = 3;
-        this.CollisionDistance = this.RefDistance * 1.65;
+        this.CollisionDistance = this.RefDistance * 2;
 
         this.PositionsB = null;
         this.TransverseVectorsB = null;
