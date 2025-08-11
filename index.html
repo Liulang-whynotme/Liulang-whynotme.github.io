@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>一个扭转的小纸环</title>
+    <link rel="icon" href="Favicon_Ring_Dark.png" media="(prefers-color-scheme: dark)" type="image/png" />
+    <link rel="icon" href="Favicon_Ring_Light.png" media="(prefers-color-scheme: light)" type="image/png" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #666666, #cccccc);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #title {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: black;
+            font-size: 32px;
+            font-weight: bold;
+            z-index: 100;
+            text-align: center;
+        }
+        
+        #subtitle {
+            position: absolute;
+            top: 65px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: black;
+            font-size: 18px;
+            z-index: 100;
+            text-align: center;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: black;
+            font-size: 18px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 0;
+            margin: 0;
+            background: none;
+            border: none;
+        }
+        
+        #controls label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        #controls input[type="range"] {
+            width: 400px;
+            height: 25px;
+            margin: 0 10px;
+            cursor: pointer;
+        }
+        
+        #controls span {
+            display: inline-block;
+            width: 40px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        #splitButton {
+            margin-top: 8px;
+            padding: 10px 26px;
+            background: #0062ff;
+            color: rgb(255, 255, 255);
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 20px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        #splitButton:hover:not(:disabled) {
+            background-color: #5093ff;
+        }
+        
+        #splitButton:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        @media screen and (orientation: portrait) and (max-device-width: 768px) and (max-device-height: 1024px)
+        {
+            #title {
+                font-size: 22px;
+            }
+            
+            #subtitle {
+                font-size: 16px;
+                top: 48px;
+            }
+            
+            #controls {
+                bottom: 20px;
+                width: 90vw;
+                max-width: 400px;
+            }
+            
+            #controls label {
+                font-size: 16px;
+                justify-content: space-between;
+            }
+            
+            #controls input[type="range"] {
+                width: 160px;
+                max-width: 180px;
+                min-width: 40px;
+            }
+            
+            #controls span {
+                font-size: 16px;
+                width: 30px;
+            }
+            
+            #splitButton {
+                font-size: 16px;
+                padding: 10px 14px;
+            }
+        }
+        
+        @media  screen and (orientation: landscape) and (max-device-width: 1024px) and (max-device-height: 768px)
+        {
+            #title {
+                font-size: 22px;
+                top: 8px;
+            }
+            
+            #subtitle {
+                font-size: 16px;
+                top: 38px;
+            }
+            
+            #controls {
+                width: 95vw;
+                max-width: 320px;
+                bottom: 20px;
+            }
+            
+            #controls label {
+                font-size: 16px;
+                gap: 12px;
+            }
+            
+            #controls input[type="range"] {
+                max-width: 180px;
+                min-width: 40px;
+            }
+            
+            #controls span {
+                font-size: 16px;
+                width: auto;
+                text-align: center;
+            }
+            
+            #splitButton {
+                font-size: 12px;
+                padding: 10px 14px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="title">一个扭转的小纸环</div>
+    <div id="subtitle">使用鼠标/手指拖拽纸环</div>
+    
+    <div id="controls">
+        <label>
+            扭转半圈数: <span id="twistValue">0</span>
+            <input type="range" id="twist" min="0" max="4" value="0" step="1">
+        </label>
+        <button id="splitButton">
+            沿中线剪开
+        </button>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports":{
+                "three": "./three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from './three.module.js';
+        import { OrbitControls } from './OrbitControls.js';
+        import { MakeRing } from './MakeRings.js';
+
+        let scene, camera, renderer, meshA, meshB, material, group, controls, isMobile;
+        let makeRing;
+        let raycaster, mouse;
+        let dragStartPoint, dragStartMouse, delta, dragPlane, pointCoordinate;
+
+        function init() 
+        {
+            // 创建场景
+            scene = new THREE.Scene();
+            // Create gradient background for the scene
+            const canvas = document.createElement('canvas');
+            canvas.width = 2;
+            canvas.height = 512;
+            const context = canvas.getContext('2d');
+            const gradient = context.createLinearGradient(0, 0, 0, 512);
+            gradient.addColorStop(0, '#666666');
+            gradient.addColorStop(1, '#cccccc');
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 2, 512);
+            
+            const backgroundTexture = new THREE.CanvasTexture(canvas);
+            scene.background = backgroundTexture;
+
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(180, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            // 检测是否为移动设备
+            isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // 根据设备类型设置相机初始位置
+            if (isMobile) 
+            {
+                camera.position.set(30, 30, 30); // 移动设备上更远的位置
+            } else 
+            {
+                camera.position.set(20, 20, 20); // 桌面设备上的位置
+            }
+            camera.lookAt(0, 0, 0);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            // 创建轨道控制器
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.mouseButtons.LEFT =  THREE.MOUSE.ROTATE;
+            controls.mouseButtons.MIDDLE =  THREE.MOUSE.PAN;
+            controls.mouseButtons.RIGHT =  THREE.MOUSE.PAN;
+            controls.minDistance = 15;  // 最小距离5单位
+            controls.maxDistance = 100; // 最大距离50单位
+
+            // 创建环境光 - 降低强度以突出结构色
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+            scene.add(ambientLight);
+
+            // 创建相机绑定的光源组
+            const cameraLightGroup = new THREE.Group();
+            cameraLightGroup.name = 'cameraLightGroup';
+            scene.add(cameraLightGroup);
+
+            // 主光源 - 白色方向光，强度适中
+            const mainLight = new THREE.DirectionalLight(0xffffff, 0.85);
+            mainLight.position.set(0, 0, 1); // 相对于相机前方
+            cameraLightGroup.add(mainLight);
+
+            // 彩色补光 - 从多个角度提供不同色温的光源以激发彩虹效果
+            const warmLight = new THREE.DirectionalLight(0xffaa88, 0.4);
+            warmLight.position.set(1, 0.5, 0.5);
+            cameraLightGroup.add(warmLight);
+
+            const coolLight = new THREE.DirectionalLight(0x88aaff, 0.4);
+            coolLight.position.set(-1, 0.5, 0.5);
+            cameraLightGroup.add(coolLight);
+
+            // 侧光 - 增强结构色可见性
+            const sideLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            sideLight.position.set(0, 1, -0.5);
+            cameraLightGroup.add(sideLight);
+
+            material = new THREE.MeshPhysicalMaterial({
+                color: 0xFFD394,
+                metalness: 0.05,              // 轻微金属感以突出结构色
+                roughness: 0.5,              // 适度粗糙度平衡柔和与彩虹效果
+                clearcoat: 0.2,               // 清漆层增强彩虹反射
+                clearcoatRoughness: 0.3,     // 较光滑的清漆表面
+                iridescence: 0.96,             // 最大化结构色强度
+                iridescenceIOR: 0.82,          // 提高折射率以增强彩虹分离
+                iridescenceThicknessRange: [100, 900],  // 更宽的厚度范围产生更多颜色变化
+                side: THREE.DoubleSide,
+                envMapIntensity: 0.7,         // 适中的环境反射强度
+                transparent: true,
+                opacity: 1
+            });
+
+
+            // 初始创建几何体
+            makeRing = new MakeRing();
+            makeRing.InitializeParticles(THREE);
+            createObject();
+
+            // 设置控件事件
+            setupControls();
+
+            // 处理窗口大小变化
+            window.addEventListener('resize', onWindowResize, false);
+            
+            // 初始化鼠标追踪
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            dragStartPoint = new THREE.Vector3();
+            pointCoordinate = new THREE.Vector2();
+            delta = new THREE.Vector3();
+            makeRing.fixedPointID_Left = -1;
+            
+            // 添加鼠标事件监听器
+            renderer.domElement.addEventListener('mousemove', onMouseMove, false);
+            renderer.domElement.addEventListener('mousedown', onMouseDown, false);
+            renderer.domElement.addEventListener('mouseup', onMouseUp, false);
+            
+            // 添加触摸事件监听器
+            renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+            renderer.domElement.addEventListener('touchmove', onTouchMove, false);
+            renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+            
+        }
+
+        function createObject()
+        {
+            if (group)
+            {
+                scene.remove(group);
+            }
+            
+            const geometry = makeRing.createGeometry(THREE);
+            
+            meshA = new THREE.Mesh(geometry.A, material);
+            meshA.geometry.boundingSphere = new THREE.Sphere().set(new THREE.Vector3(0, 0, 0), 100);
+            group = new THREE.Group();
+            group.add(meshA);
+            if (geometry.B)
+            {
+                meshB = new THREE.Mesh(geometry.B, material);
+                meshB.geometry.boundingSphere = new THREE.Sphere().set(new THREE.Vector3(0, 0, 0), 100);
+                group.add(meshB);
+            }
+            scene.add(group);
+        }
+
+        function updateObject() 
+        {
+            if (group) 
+            {
+                if (meshB)
+                {
+                    makeRing.updateVertices(THREE, meshA.geometry, meshB.geometry);
+                    makeRing.updateNormals(meshA.geometry, meshB.geometry);
+                }else
+                {
+                    makeRing.updateVertices(THREE, meshA.geometry, null);
+                    makeRing.updateNormals(meshA.geometry, null);
+                }
+            }
+        }
+
+        function setupControls() 
+        {
+            const twistSlider = document.getElementById('twist');
+            const splitButton = document.getElementById('splitButton');
+
+            twistSlider.addEventListener('input', (e) => {
+                makeRing.TwistNum = parseInt(e.target.value);
+                document.getElementById('twistValue').textContent = e.target.value;
+                makeRing.InitializeParticles(THREE);
+                if (meshB)
+                {
+                    group.remove(meshB);
+                    meshB = null;
+                }
+                
+                if (isMobile) 
+                {
+                    camera.position.set(30, 30, 30); // 移动设备上更远的位置
+                } else 
+                {
+                    camera.position.set(20, 20, 20); // 桌面设备上的位置
+                }
+                camera.lookAt(0, 0, 0);
+                controls.target.set(0, 0, 0);
+                controls.update();
+
+                createObject();
+                
+                splitButton.disabled = false;
+                splitButton.style.backgroundColor = '#0062ff';
+                splitButton.style.cursor = 'pointer';
+            });
+
+            splitButton.addEventListener('click', () => {
+                makeRing.DoubleTheParticles(THREE);
+                createObject();
+                
+                splitButton.disabled = true;
+                splitButton.style.backgroundColor = '#cccccc';
+                splitButton.style.cursor = 'not-allowed';
+            });
+        }
+
+        function onWindowResize() 
+        {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) 
+        {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            if (makeRing.fixedPointID_Left !== -1)
+            {
+                const currentMouseRay = new THREE.Ray();
+                raycaster.setFromCamera(mouse, camera);
+                currentMouseRay.origin.copy(raycaster.ray.origin);
+                currentMouseRay.direction.copy(raycaster.ray.direction);
+                
+                const currentPoint = new THREE.Vector3();
+                
+                if (currentMouseRay.intersectPlane(dragPlane, currentPoint)) 
+                {
+                    delta.subVectors(currentPoint, dragStartPoint);
+
+                    dragStartPoint.copy(currentPoint);
+                    
+                    dragStartMouse.set(mouse.x, mouse.y);
+                }
+            }
+            
+        }
+
+        function onMouseDown(event)
+        {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            
+            const intersects = raycaster.intersectObject(group, true);
+            
+            if (intersects.length > 0) 
+            {
+                makeRing.fixedPointID_Left = Math.floor(intersects[0].faceIndex / (makeRing.InterpolationNum * 2));
+                if (intersects[0].object===meshA)
+                {
+                    makeRing.fixedPointMesh_Left = 'A';
+                    if (makeRing.fixedPointID_Left===makeRing.ParticleNum - 1)
+                    {
+                        makeRing.fixedPointID_Right = 0;
+                        if (meshB && makeRing.TwistNum%2!==0)
+                        {
+                            makeRing.fixedPointMesh_Right = 'B';
+                        }else
+                        {
+                            makeRing.fixedPointMesh_Right = 'A';
+                        }
+                    }else
+                    {
+                        makeRing.fixedPointID_Right = makeRing.fixedPointID_Left + 1;
+                        makeRing.fixedPointMesh_Right = 'A';
+                    }
+                }else
+                {
+                    makeRing.fixedPointMesh_Left = 'B';
+                    if (makeRing.fixedPointID_Left===makeRing.ParticleNum - 1)
+                    {
+                        makeRing.fixedPointID_Right = 0;
+                        if (makeRing.TwistNum%2!==0)
+                        {
+                            makeRing.fixedPointMesh_Right = 'A';
+                        }else
+                        {
+                            makeRing.fixedPointMesh_Right = 'B';
+                        }
+                    }else
+                    {
+                        makeRing.fixedPointID_Right = makeRing.fixedPointID_Left + 1;
+                        makeRing.fixedPointMesh_Right = 'B';
+                    }
+                }
+                
+                dragStartPoint.copy(intersects[0].point);
+                dragStartMouse = new THREE.Vector2(mouse.x, mouse.y);
+                var X = new THREE.Vector3();
+                var Y = new THREE.Vector3();
+                var P = new THREE.Vector3();
+                if (makeRing.fixedPointMesh_Left==='A')
+                {
+                    if (makeRing.fixedPointMesh_Right==='A')
+                    {
+                        X.subVectors(makeRing.PositionsA[makeRing.fixedPointID_Right], makeRing.PositionsA[makeRing.fixedPointID_Left]);
+                    }else
+                    {
+                        X.subVectors(makeRing.PositionsB[makeRing.fixedPointID_Right], makeRing.PositionsA[makeRing.fixedPointID_Left]);
+                    }
+                    Y = new THREE.Vector3().copy(makeRing.TransverseVectorsA[makeRing.fixedPointID_Left]).multiplyScalar(makeRing.Width/2);
+                    P = new THREE.Vector3().subVectors(dragStartPoint, makeRing.PositionsA[makeRing.fixedPointID_Left])
+                }else
+                {
+                    if (makeRing.fixedPointMesh_Right==='A')
+                    {
+                        X.subVectors(makeRing.PositionsA[makeRing.fixedPointID_Right], makeRing.PositionsB[makeRing.fixedPointID_Left]);
+                    }else
+                    {
+                        X.subVectors(makeRing.PositionsB[makeRing.fixedPointID_Right], makeRing.PositionsB[makeRing.fixedPointID_Left]);
+                    }
+                    Y = new THREE.Vector3().copy(makeRing.TransverseVectorsB[makeRing.fixedPointID_Left]).multiplyScalar(makeRing.Width/2);
+                    P = new THREE.Vector3().subVectors(dragStartPoint, makeRing.PositionsB[makeRing.fixedPointID_Left])
+                }
+
+                const D = X.dot(X) * Y.dot(Y) - X.dot(Y) * X.dot(Y);
+                pointCoordinate.x = (X.dot(P) * Y.dot(Y) - Y.dot(P) * X.dot(Y)) / D;
+                pointCoordinate.y = (X.dot(X) * Y.dot(P) - X.dot(P) * X.dot(Y)) / D;
+                
+                controls.enabled = false;
+                const cameraDirection = new THREE.Vector3();
+                camera.getWorldDirection(cameraDirection);
+                dragPlane = new THREE.Plane(cameraDirection, -dragStartPoint.dot(cameraDirection));
+            } else 
+            {
+                makeRing.fixedPointID_Left = -1;
+            }
+        }
+
+        function onMouseUp(event)
+        {
+            makeRing.fixedPointID_Left = -1;
+            controls.enabled = true;
+        }
+
+        function onTouchStart(event) {
+            event.preventDefault();
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                const mouseEvent = {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                };
+                onMouseDown(mouseEvent);
+            }
+        }
+
+        function onTouchMove(event) {
+            event.preventDefault();
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                const mouseEvent = {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                };
+                onMouseMove(mouseEvent);
+            }
+        }
+
+        function onTouchEnd(event) {
+            event.preventDefault();
+            onMouseUp({});
+        }
+
+        let cameraFOVAnimationComplete = false;
+        const targetFOV = 60;
+        const animationDuration = 800;
+        const startTime = Date.now();
+        
+        function animate()
+        {
+            requestAnimationFrame(animate);
+            
+            // 相机FOV动画和材质透明度动画
+            if (!cameraFOVAnimationComplete) 
+            {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.sin(elapsed / animationDuration * Math.PI * 0.5);
+                const currentFOV = 180 * (1 - progress) + progress * targetFOV;
+                meshA.material.opacity = progress;
+                
+                camera.fov = currentFOV;
+                camera.updateProjectionMatrix();
+                
+                if (elapsed / animationDuration >= 1) 
+                {
+                    cameraFOVAnimationComplete = true;
+                }
+            }
+            
+            controls.update();
+            
+            // 更新相机光源组位置，使其跟随相机
+            const cameraLightGroup = scene.getObjectByName('cameraLightGroup');
+            if (cameraLightGroup) 
+            {
+                cameraLightGroup.position.copy(camera.position);
+                cameraLightGroup.quaternion.copy(camera.quaternion);
+            }
+            
+            makeRing.RepulsionFactor = 0.2 + (makeRing.RepulsionFactor-0.2)*0.996;
+
+            for (let i = 0; i < 200; i++)
+            {
+                makeRing.RunDynamics(THREE, delta, pointCoordinate);
+                makeRing.Dragging(THREE, dragStartPoint, delta, pointCoordinate);
+            }
+            makeRing.InterpolateTheParticles(THREE);
+            updateObject();
+            renderer.render(scene, camera);
+        }
+
+        init();
+        animate();
+    </script>
+
+</body>
+</html>
